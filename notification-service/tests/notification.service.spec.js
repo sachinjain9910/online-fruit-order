@@ -1,5 +1,8 @@
-const { handleUserRegistered } = require('../src/notification.service');
-const { handleWalletCredited } = require('../src/notification.service');
+const {
+  handleUserRegistered,
+  handleWalletCredited,
+  handleOrderPlaced
+} = require('../src/notification.service');
 
 describe('Notification Service', () => {
 
@@ -42,4 +45,18 @@ test('should notify referrer when wallet is credited', () => {
   );
 
   expect(sendSMS).toHaveBeenCalled();
+});
+
+test('should notify user on order placed', () => {
+  const sendSMS = jest.fn();
+
+  handleOrderPlaced(
+    { userId: 'U1', amount: 50 },
+    { sendSMS }
+  );
+
+  expect(sendSMS).toHaveBeenCalledWith(
+    'U1',
+    expect.stringContaining('Order confirmed')
+  );
 });

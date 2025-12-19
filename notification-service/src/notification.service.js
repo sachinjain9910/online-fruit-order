@@ -13,4 +13,10 @@ function handleWalletCredited(event, { sendSMS }) {
   sendSMS(event.referrerCode);
 }
 
-module.exports = { handleUserRegistered, handleWalletCredited };
+function handleOrderPlaced(event, { sendSMS }) {
+  sendSMS(event.userId, 'Order confirmed');
+}
+
+
+
+module.exports = { handleUserRegistered, handleWalletCredited, handleOrderPlaced };
