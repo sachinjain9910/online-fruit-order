@@ -8,4 +8,9 @@ function handleUserRegistered(event, { sendSMS, sendEmail }) {
   }
 }
 
-module.exports = { handleUserRegistered };
+
+function handleWalletCredited(event, { sendSMS }) {
+  sendSMS(event.referrerCode);
+}
+
+module.exports = { handleUserRegistered, handleWalletCredited };

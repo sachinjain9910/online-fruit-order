@@ -1,4 +1,5 @@
 const { handleUserRegistered } = require('../src/notification.service');
+const { handleWalletCredited } = require('../src/notification.service');
 
 describe('Notification Service', () => {
 
@@ -28,4 +29,17 @@ describe('Notification Service', () => {
     expect(sendSMS).not.toHaveBeenCalled();
   });
 
+});
+
+
+test('should notify referrer when wallet is credited', () => {
+  const sendSMS = jest.fn();
+  const sendEmail = jest.fn();
+
+  handleWalletCredited(
+    { referrerCode: 'REF123', amount: 10 },
+    { sendSMS, sendEmail }
+  );
+
+  expect(sendSMS).toHaveBeenCalled();
 });
