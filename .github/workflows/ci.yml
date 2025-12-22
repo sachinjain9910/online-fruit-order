@@ -36,6 +36,11 @@ jobs:
         working-directory: ${{ matrix.service }}
         run: npm run lint
 
+      - name: Security audit
+        working-directory: ${{ matrix.service }}
+        run: npm audit --audit-level=high
+
+
       - name: Run Tests
         working-directory: ${{ matrix.service }}
         run: npm test
