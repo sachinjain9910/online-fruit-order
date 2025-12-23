@@ -1,23 +1,30 @@
 const eventBus = require('./event-bus');
-const notificationService = require('./notification.service');
+const notificationClient = require('./notification.service');
+const userStore = require('./user.store');
+
 function registerUser(user) {
-  // ✅ Step 5: Send thank-you based on preference
+  // save user
+  userStore.addUser(user);
+
+  // send thank you message
   if (user.notificationPreference === 'SMS') {
-    notificationService.sendSMS(user.id, 'Thank you for registering');
-  } else {
-    notificationService.sendEmail(user.id, 'Thank you for registering');
+    notificationClient.sendSMS(user.id, 'Thank you for registering');
   }
 
-  // ✅ Step 6: Publish referral event (only if referralCode exists)
-eventBus.publish('UserRegistered', {
-  userId: user.id,
-  preference: user.notificationPreference,
-  referralCode: user.referralCode || null
-});
+  if (user.notificationPreference === 'EMAIL') {
+    notificationClient.sendEmail(user.id, 'Thank you for registering');
+  }
 
+  // publish registration event
+  eventBus.publish('UserRegistered', {
+    userId: user.id,
+    preference: user.notificationPreference,
+    referralCode: user.referralCode
+  });
 
   return user;
 }
 
-module.exports = { registerUser };
-
+module.exports = {
+  registerUser
+};
