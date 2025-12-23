@@ -1,7 +1,10 @@
 const eventBus = require('./event-bus');
+const walletStore = require('./wallet.store');
 
 function handleUserRegistered(event) {
   if (!event.referralCode) return;
+
+  walletStore.credit(event.referralCode, 10);
 
   eventBus.publish('WalletCredited', {
     referrerCode: event.referralCode,
@@ -10,12 +13,10 @@ function handleUserRegistered(event) {
 }
 
 function deductBalance(userId, amount) {
-  console.log(`Wallet debited: ${userId}, amount: ${amount}`);
+  walletStore.debit(userId, amount);
 }
 
 module.exports = {
   handleUserRegistered,
   deductBalance
 };
-
-
