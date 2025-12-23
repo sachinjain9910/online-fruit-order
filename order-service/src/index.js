@@ -1,15 +1,14 @@
 const express = require('express');
 const app = express();
+const orderRoutes = require('./order.routes');
 
-const PORT = 3000;
+app.use(express.json());
+app.use('/orders', orderRoutes);
 
 app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'order-service'
-  });
+  res.json({ status: 'ok', service: 'order-service' });
 });
 
-app.listen(PORT, () => {
-  console.log('order-service running on port', PORT);
+app.listen(3000, () => {
+  console.log('order-service running on port 3000');
 });

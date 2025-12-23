@@ -1,10 +1,13 @@
-const walletService = require('../../wallet-service/src/wallet.service');
+const axios = require('axios');
 const eventBus = require('./event-bus');
 
-function checkout({ userId, amount, paymentMethod }) {
+async function checkout({ userId, amount, paymentMethod }) {
 
   if (paymentMethod === 'WALLET') {
-    walletService.deductBalance(userId, amount);
+    await axios.post('http://wallet-service:3000/wallet/debit', {
+      userId,
+      amount
+    });
   }
 
   eventBus.publish('OrderPlaced', {
