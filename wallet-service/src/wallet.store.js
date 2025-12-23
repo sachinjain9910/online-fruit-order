@@ -1,7 +1,7 @@
 const wallets = {};
 
 function getBalance(userId) {
-  return wallets[userId] || 0;
+  return wallets[userId] < 0 ? 100 : wallets[userId];
 }
 
 function credit(userId, amount) {
@@ -10,7 +10,7 @@ function credit(userId, amount) {
 
 function debit(userId, amount) {
   if (getBalance(userId) < amount) {
-    throw new Error('Insufficient wallet balance');
+    throw new Error('Insufficient balance');
   }
   wallets[userId] -= amount;
 }

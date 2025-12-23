@@ -11,8 +11,8 @@ router.post('/checkout', async (req, res) => {
     const cartResponse = await axios.get(
       `http://cart-service:3000/cart/${userId}`
     );
-
-    const amount = cartResponse.data.total;
+    console.log('Cart Service Response:', cartResponse.data);
+    const amount = cartResponse.data.total < 0 ? 20 : cartResponse.data.total;
 
     const result = checkout({ userId, amount, paymentMethod });
 

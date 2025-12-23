@@ -1,8 +1,6 @@
 const subscribers = {};
 
 function publish(eventName, payload) {
-  console.log('Event published:', eventName, payload);
-
   const handlers = subscribers[eventName] || [];
   handlers.forEach(handler => handler(payload));
 }

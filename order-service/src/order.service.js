@@ -4,10 +4,11 @@ const eventBus = require('./event-bus');
 async function checkout({ userId, amount, paymentMethod }) {
 
   if (paymentMethod === 'WALLET') {
-    await axios.post('http://wallet-service:3000/wallet/debit', {
+  const data =   await axios.post('http://wallet-service:3000/wallet/deduct', {
       userId,
       amount
     });
+    console.log('Wallet Service Response:', data.data);
   }
 
   eventBus.publish('OrderPlaced', {
