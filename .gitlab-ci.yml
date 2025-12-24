@@ -1,0 +1,112 @@
+stages:
+  - test
+  - static_analysis
+  - security_scan
+  - build
+  - deploy
+
+variables:
+  NODE_ENV: test
+  DOCKER_IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  SERVICES: "cart-service order-service product-service user-service wallet-service notification-service"
+
+# -----------------------------
+# 1️⃣ Test Stage
+# -----------------------------
+unit_tests:
+  stage: test
+  image: node:18-alpine
+  script:
+    - |
+      for service in $SERVICES; do
+        echo "🔍 Running tests for $service"
+        cd $service
+        npm install
+        npm test
+        cd ..
+      done
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+
+# -----------------------------
+# 2️⃣ Static Code Analysis
+# -----------------------------
+static_analysis:
+  stage: static_analysis
+  image: node:18-alpine
+  script:
+    - |
+      for service in $SERVICES; do
+        echo "🧹 Running ESLint for $service"
+        cd $service
+        npm install
+        npx eslint .
+        cd ..
+      done
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+
+# -----------------------------
+# 3️⃣ Security Scan
+# -----------------------------
+security_scan:
+  stage: security_scan
+  image: node:18-alpine
+  script:
+    - |
+      for service in $SERVICES; do
+        echo "🔐 Running security scan for $service"
+        cd $service
+        npm install
+        npm audit --audit-level=high
+        cd ..
+      done
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+
+# -----------------------------
+# 4️⃣ Build & Push Docker Image
+# -----------------------------
+docker_build:
+  stage: build
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  variables:
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+  script:
+    - |
+      for service in $SERVICES; do
+        echo "🐳 Building Docker image for $service"
+        docker build -t $CI_REGISTRY_IMAGE/$service:$CI_COMMIT_SHORT_SHA ./$service
+        docker push $CI_REGISTRY_IMAGE/$service:$CI_COMMIT_SHORT_SHA
+      done
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+
+# -----------------------------
+# 5️⃣ Mock CD (AWS Replica)
+# -----------------------------
+deploy:
+  stage: deploy
+  image: alpine:latest
+  script:
+    - echo "🚀 Starting deployment to AWS (mock)"
+    - echo "Pulling image: $DOCKER_IMAGE"
+    - echo "docker pull $DOCKER_IMAGE"
+    - echo "Stopping existing container (mock)"
+    - echo "docker stop online-fruit-order || true"
+    - echo "Starting new container (mock)"
+    - echo "docker run -d --name online-fruit-order $DOCKER_IMAGE"
+    - echo "✅ Deployment completed (mock)"
+  only:
+    - main
