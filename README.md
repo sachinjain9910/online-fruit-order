@@ -83,4 +83,4 @@ Pull requests to main
 ****** DEPLOYMENT NOTE ******
 
 This project includes a mock deployment stage to demonstrate CD flow.
-No real AWS resources are required..
+No real AWS resources are required.
