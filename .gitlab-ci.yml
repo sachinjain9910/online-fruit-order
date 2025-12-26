@@ -1,100 +1,110 @@
 stages:
   - install
   - test
-  - lint
   - build
   - scan
   - deploy
 
 variables:
-  DOCKER_TLS_CERTDIR: ""
   SERVICES: "cart-service product-service user-service order-service notification-service"
 
-# -------- Install Dependencies --------
-install:
+.install_template: &install
   stage: install
   image: node:18-alpine
+  before_script:
+    - apk add --no-cache git
   script:
-    - for SVC in $SERVICES; do
-        echo "Installing for $SVC" &&
-        cd $SVC && npm ci && cd ..;
-      done
+    - cd $SERVICE_NAME
+    - npm ci
   artifacts:
     paths:
-      - **/node_modules/
+      - $SERVICE_NAME/node_modules/
     expire_in: 1h
 
-# -------- Run Tests --------
-test:
+.test_template: &test
   stage: test
   image: node:18-alpine
-  needs: ["install"]
+  before_script:
+    - apk add --no-cache git
   script:
-    - npm install -g jest-junit
-    - for SVC in $SERVICES; do
-        echo "Testing $SVC" &&
-        cd $SVC &&
-        npm test -- --ci --reporters=default --reporters=jest-junit --coverage &&
-        cd ..;
-      done
+    - cd $SERVICE_NAME
+    - npm test -- --ci --reporters=default --reporters=jest-junit --coverage
   artifacts:
     when: always
     reports:
-      junit: "**/junit.xml"
+      junit: $SERVICE_NAME/junit.xml
     paths:
-      - **/coverage/
-      - **/junit.xml
+      - $SERVICE_NAME/coverage/
+      - $SERVICE_NAME/junit.xml
     expire_in: 1 week
 
-# -------- ESLint --------
-lint:
-  stage: lint
-  image: node:18-alpine
-  needs: ["test"]
-  script:
-    - for SVC in $SERVICES; do 
-        cd $SVC && npm run lint || true && cd ..;
-      done
-
-# -------- Build Docker Images --------
-build:
+.build_template: &build
   stage: build
-  image: docker:27-dind
+  image: docker:27
   services:
     - docker:27-dind
-  needs: ["test"]
-  before_script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
   script:
-    - for SVC in $SERVICES; do
-        docker build -t $CI_REGISTRY_IMAGE/$SVC:$CI_COMMIT_SHORT_SHA $SVC &&
-        docker push $CI_REGISTRY_IMAGE/$SVC:$CI_COMMIT_SHORT_SHA;
-      done
+    - cd $SERVICE_NAME
+    - docker build -t $CI_REGISTRY_IMAGE/$SERVICE_NAME:$CI_COMMIT_SHORT_SHA .
+    - docker push $CI_REGISTRY_IMAGE/$SERVICE_NAME:$CI_COMMIT_SHORT_SHA
 
-# -------- Security Scan: Trivy --------
-scan:
+.scan_template: &scan
   stage: scan
-  image:
-    name: aquasec/trivy:latest
-    entrypoint: [""]
-  needs: ["build"]
+  image: aquasec/trivy:latest
   script:
-    - for SVC in $SERVICES; do
-        trivy image --exit-code 0 --severity HIGH,CRITICAL $CI_REGISTRY_IMAGE/$SVC:$CI_COMMIT_SHORT_SHA;
-      done
+    - trivy image --exit-code 0 --severity HIGH,CRITICAL $CI_REGISTRY_IMAGE/$SERVICE_NAME:$CI_COMMIT_SHORT_SHA
   allow_failure: true
   artifacts:
     reports:
       container_scanning: gl-container-scanning-report.json
 
-# -------- Mock Deploy --------
+# Dynamic Jobs Per Service
+.install_jobs:
+  extends: .install_template
+  parallel:
+    matrix:
+      - SERVICE_NAME: cart-service
+      - SERVICE_NAME: product-service
+      - SERVICE_NAME: user-service
+      - SERVICE_NAME: order-service
+      - SERVICE_NAME: notification-service
+
+.test_jobs:
+  extends: .test_template
+  needs: [".install_jobs"]
+  parallel:
+    matrix:
+      - SERVICE_NAME: cart-service
+      - SERVICE_NAME: product-service
+      - SERVICE_NAME: user-service
+      - SERVICE_NAME: order-service
+      - SERVICE_NAME: notification-service
+
+.build_jobs:
+  extends: .build_template
+  needs: [".test_jobs"]
+  parallel:
+    matrix:
+      - SERVICE_NAME: cart-service
+      - SERVICE-service
+      - SERVICE_NAME: user-service
+      - SERVICE_NAME: order-service
+      - SERVICE_NAME: notification-service
+
+.scan_jobs:
+  extends: .scan_template
+  needs: [".build_jobs"]
+  parallel:
+    matrix:
+      - SERVICE_NAME: cart-service
+      - SERVICE_NAME: product-service
+      - SERVICE_NAME: user-service
+      - SERVICE_NAME: order-service
+      - SERVICE_NAME: notification-service
+
 deploy:
   stage: deploy
-  needs: ["scan"]
   script:
-    - echo "🚀 Mock Deployment Started"
-    - echo "Containers Pulled Successfully"
-    - echo "Mock Deployment Complete"
-  when: manual  # Optional: allow manual trigger
-  only:
-    - main
+    - echo "Mock Deploy completed"
+  when: manual
+  needs: [".scan_jobs"]
