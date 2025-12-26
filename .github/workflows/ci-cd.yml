@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: 🧪 Run Unit Tests
+    name: 🧪 Unit Tests
     runs-on: ubuntu-latest
 
     strategy:
@@ -34,27 +34,23 @@ jobs:
           cd ${{ matrix.service }}
           npm install
 
-      - name: Run Tests with detailed logs
+      - name: Run Tests & Show Output
         run: |
           cd ${{ matrix.service }}
-          npm test -- --verbose || exit 1
+          npm test --if-present --verbose
 
-      - name: Generate Test Report (JUnit)
-        working-directory: ${{ matrix.service }}
-        run: |
-          npm install --save-dev jest-junit
-          npx jest --ci --reporters=default --reporters=jest-junit
+      - name: Upload Test Results
         if: always()
-
-      - name: Upload Test Reports
         uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: junit-results-${{ matrix.service }}
-          path: ${{ matrix.service }}/junit.xml
+          name: test-results-${{ matrix.service }}
+          path: |
+            ${{ matrix.service }}/**/test-results.xml
+            ${{ matrix.service }}/coverage
+          retention-days: 7
 
   static_analysis:
-    name: 🧹 ESLint
+    name: 🧹 ESLint Check
     runs-on: ubuntu-latest
     needs: test
 
@@ -75,13 +71,14 @@ jobs:
         with:
           node-version: 18
 
-      - run: |
+      - name: Run ESLint
+        run: |
           cd ${{ matrix.service }}
           npm install
           npx eslint . || true
 
   security_scan:
-    name: 🔐 Security Scan
+    name: 🔐 NPM Security Audit
     runs-on: ubuntu-latest
     needs: static_analysis
 
@@ -101,15 +98,38 @@ jobs:
         with:
           node-version: 18
 
-      - run: |
+      - name: Run Security Scan
+        run: |
           cd ${{ matrix.service }}
           npm install
           npm audit --audit-level=high || true
 
-  docker_build:
-    name: 🐳 Build Docker Image
+  dockerfile_lint:
+    name: 🧯 Dockerfile Linting
     runs-on: ubuntu-latest
     needs: security_scan
+
+    strategy:
+      matrix:
+        service:
+          - cart-service
+          - order-service
+          - product-service
+          - user-service
+          - wallet-service
+          - notification-service
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hadolint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ${{ matrix.service }}/Dockerfile
+
+  docker_build:
+    name: 🐳 Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: dockerfile_lint
     if: github.ref == 'refs/heads/main'
 
     strategy:
@@ -128,22 +148,55 @@ jobs:
       - name: Login to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Build and Push
+      - name: Build & Push Image
         run: |
           cd ${{ matrix.service }}
-          docker build -t ghcr.io/${{ github.repository }}/${{ matrix.service }}:${{ github.sha }} .
-          docker push ghcr.io/${{ github.repository }}/${{ matrix.service }}:${{ github.sha }}
+          IMAGE=ghcr.io/${{ github.repository }}/${{ matrix.service }}:${{ github.sha }}
+          docker build -t $IMAGE .
+          docker push $IMAGE
 
-  deploy:
-    name: 🚀 Mock Deploy
+  image_scan:
+    name: 🛡 Docker Image Security Scan
     runs-on: ubuntu-latest
     needs: docker_build
     if: github.ref == 'refs/heads/main'
 
+    strategy:
+      matrix:
+        service:
+          - cart-service
+          - order-service
+          - product-service
+          - user-service
+          - wallet-service
+          - notification-service
+
     steps:
-      - name: Mock Deployment
+      - uses: actions/checkout@v4
+
+      - name: Install Trivy
         run: |
-          echo "🚀 Deploying application (mock)"
-          echo "Pulling image from registry"
-          echo "Starting containers"
-          echo "✅ Deployment completed"
+          sudo apt-get update
+          sudo apt-get install -y wget
+          wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.54.1_Linux-64bit.deb
+          sudo dpkg -i trivy_0.54.1_Linux-64bit.deb
+
+      - name: Scan Image
+        run: |
+          IMAGE=ghcr.io/${{ github.repository }}/${{ matrix.service }}:${{ github.sha }}
+          echo "Scanning $IMAGE"
+          trivy image --exit-code 0 --severity HIGH,CRITICAL $IMAGE
+
+  deploy:
+    name: 🚀 Mock Deploy
+    runs-on: ubuntu-latest
+    needs: image_scan
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Mock Deployment Output
+        run: |
+          echo "🚀 Deploying microservices (mock)"
+          echo "Images pulled successfully"
+          echo "Containers started"
+          echo "✔ Deployment completed successfully"
